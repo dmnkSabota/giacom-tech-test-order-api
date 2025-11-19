@@ -21,14 +21,6 @@ docker-compose up
 
 API available at `http://localhost:8000`
 
-## Technical Decisions
-
-Used repository pattern with service layer. Main challenge was handling Guid byte arrays differently for SQL Server vs in-memory tests - ended up using separate query branches.
-
-Validation happens at three levels: model annotations, controller, and repository.
-
-Tests run against in-memory SQLite.
-
 ### Example: Create Order
 ```bash
 POST /orders
