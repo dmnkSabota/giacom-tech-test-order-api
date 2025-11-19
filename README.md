@@ -23,11 +23,11 @@ API available at `http://localhost:8000`
 
 ## Technical Decisions
 
-**Database compatibility:** Separate query paths for PostgreSQL and in-memory testing to handle Guid byte array comparisons correctly.
+Used repository pattern with service layer. Main challenge was handling Guid byte arrays differently for SQL Server vs in-memory tests - ended up using separate query branches.
 
-**Validation:** Data annotations on models, ModelState checks in controllers, business rules in repository layer.
+Validation happens at three levels: model annotations, controller, and repository.
 
-**Testing:** In-memory SQLite database for isolated unit tests. Arrange-Act-Assert pattern throughout.
+Tests run against in-memory SQLite.
 
 ### Example: Create Order
 ```bash
