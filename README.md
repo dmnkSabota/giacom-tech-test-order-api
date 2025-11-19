@@ -1,56 +1,202 @@
-# Giacom Tech Test
+# Order API Microservice - Giacom Technical Assessment
 
-## Background
-Giacom Cloud Market is a B2B e-commerce platform which allows IT companies (resellers) to buy services indirectly from major vendors (Microsoft, Symantec, Webroot etc) in high volumes at low cost. IT companies then resell the purchased services on to their customers, making a small margin. Behind Cloud Market are several microservices, one of which is an Order API much like the one we are going to work on for this test.
+A RESTful API microservice for managing orders, built with .NET 8, Entity Framework Core, and PostgreSQL.
 
-## Concepts
-* Reseller = A customer of Giacom
-* Customer = A customer of a Reseller
-* Order = An order placed by a Reseller for a specific Customer
-* Order Item = A service and product which belongs to an Order
-* Order Status = The current state of an Order
-* Product = An end-offering which can be purchased e.g. '100GB Mailbox'
-* Service = The category the Product belongs to e.g. 'Email'
-* Profit = The difference between Cost and Price
+## 👤 Candidate Information
+- **Name:** Dominik [Your Last Name]
+- **Date:** November 2024
+- **Position:** Junior Software Engineer
 
-## Time
-You should allocate approx. 2 hours to complete the tech test though it will likely take less time for more experienced engineers.
+## 🎯 Completed Tasks
 
-## Pre-Reqs
-* Visual Studio 2022 (or compatible IDE for working with .net)
-* .NET 8.0 SDK
-* Git
-* Docker (running Linux containers)
-* Optional: MySQL Workbench / Heidi (database client)
-* Optional: Postman (can also use any other API client)
+### ✅ Task 1: Get Orders by Status
+**Endpoint:** `GET /orders/status/{statusName}`
 
-## Setup
-1. Clone this repository locally
-2. Using a terminal, cd to the local repository and run 'docker-compose up db', which will start and seed the database
-3. Open the solution file in /src
-4. Start debugging or run the Order.WebAPI project then query http://localhost:8000/orders in your API client / browser to test that setup is complete. You should see orders being returned from the API
-   
-## Tasks
-Add a new API endpoint for each of the following tasks:
-1. Return Orders with a specified Order Status e.g. 'Failed'
-2. Allow an Order Status to be updated to a different status e.g. 'InProgress'
-3. Allow an Order to be created. This should include validation of any parameters
-4. Calculate profit by month for all 'completed' Orders
+Retrieves all orders filtered by their status (e.g., "Completed", "Pending", "Failed").
 
-Finally, once code-complete, close your IDE, run 'docker-compose down --volumes' to stop and remove the database container. Now run 'docker-compose up'. This will run the local database and also build the microservice in Release mode. Test the API is working correctly via this method (as this is the one Giacom will run to test the submission).
+### ✅ Task 2: Update Order Status
+**Endpoint:** `PUT /orders/{orderId}/status`
 
-## Submission
-Please push your code to a new github repository then send the repository link to the email address from which the tech test was issued. If applicable, add notes in the email explaining why you have chosen a particular approach.
-Alternatively, zip or git-bundle the repository and email it.
+Updates the status of an existing order.
 
-## Help
-If you happen to run into any issues when running the Docker container, try deselecting Hyper-V Services in "Windows Features" (Search for Windows Features in Start Menu), selecting again, and then restarting your computer.
+### ✅ Task 3: Create New Order
+**Endpoint:** `POST /orders`
 
-To connect to the MySQL database directly the credentials are as follows:
-* Hostname: *localhost*
-* Username: *order-service*
-* Password: *nmCsdkhj20n@Sa*
+Creates a new order with multiple items, automatically setting initial status to "Created".
 
-If you experience further issues getting set up with the tech test please reply to the email address from which the tech test was issued with your query.
+### ✅ Task 4: Calculate Monthly Profit
+**Endpoint:** `GET /orders/profit/monthly`
 
-Copyright (c) 2025, Giacom.
+Calculates total profit grouped by month for all completed orders.
+
+## 🏗️ Architecture & Design Decisions
+
+### Clean Architecture
+- **Repository Pattern:** Separation of data access logic
+- **Service Layer:** Business logic encapsulation
+- **Dependency Injection:** Loose coupling, testable code
+- **Async/Await:** Non-blocking I/O operations
+
+### Key Technical Choices
+
+**Database Handling:**
+- Used conditional logic to support both PostgreSQL (production) and InMemory (testing)
+- Handled byte array comparisons for Guid fields differently per provider
+
+**Validation:**
+- Implemented Data Annotations for request validation
+- Controller-level validation with ModelState
+- Repository-level business rule validation
+
+**Testing Strategy:**
+- 21 comprehensive unit tests covering all CRUD operations
+- Arrange-Act-Assert pattern for clarity
+- In-memory database for isolated test execution
+
+**Code Quality:**
+- Modern C# features (C# 12 collection expressions, target-typed new)
+- XML documentation on all public APIs
+- Descriptive test names following convention
+- SonarQube compliant code
+
+## 🚀 Getting Started
+
+### Prerequisites
+- .NET 8 SDK
+- Docker & Docker Compose (for PostgreSQL)
+- PostgreSQL (if running without Docker)
+
+### Running with Docker (Recommended)
+```bash
+# Start PostgreSQL and API
+docker-compose up
+
+# API will be available at http://localhost:8000
+```
+
+### Running Locally
+```bash
+# Restore dependencies
+dotnet restore
+
+# Build solution
+dotnet build
+
+# Run tests
+dotnet test
+
+# Run API
+cd src/OrderService.WebAPI
+dotnet run
+```
+
+## 📝 API Documentation
+
+### Base URL
+```
+http://localhost:8000
+```
+
+### Endpoints
+
+#### Get All Orders
+```http
+GET /orders
+```
+
+#### Get Order by ID
+```http
+GET /orders/{orderId}
+```
+
+#### Get Orders by Status
+```http
+GET /orders/status/Completed
+```
+
+#### Create Order
+```http
+POST /orders
+Content-Type: application/json
+
+{
+  "resellerId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "customerId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "items": [
+    {
+      "productId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "quantity": 5
+    }
+  ]
+}
+```
+
+#### Update Order Status
+```http
+PUT /orders/{orderId}/status
+Content-Type: application/json
+
+{
+  "statusName": "Completed"
+}
+```
+
+#### Get Monthly Profit
+```http
+GET /orders/profit/monthly
+```
+
+## 🧪 Testing
+```bash
+# Run all tests
+dotnet test
+
+# Expected output: Total tests: 21, Passed: 21
+```
+
+### Test Coverage
+- ✅ Existing functionality (6 tests)
+- ✅ Task 1: Get orders by status (4 tests)
+- ✅ Task 2: Update order status (3 tests)
+- ✅ Task 3: Create order (5 tests)
+- ✅ Task 4: Calculate monthly profit (5 tests)
+
+## 📂 Project Structure
+```
+tech-test/
+├── src/
+│   ├── Order.Data/              # Repository & EF Core context
+│   ├── Order.Model/             # DTOs and request/response models
+│   ├── Order.Service/           # Business logic layer
+│   └── OrderService.WebAPI/     # API controllers & startup
+├── test/
+│   └── Order.Service.Tests/     # Unit tests
+├── docker-compose.yml           # Docker configuration
+└── README.md
+```
+
+## 💡 Implementation Highlights
+
+### Best Practices Applied
+- ✅ SOLID principles
+- ✅ RESTful API design
+- ✅ Async/await throughout
+- ✅ Comprehensive error handling
+- ✅ Input validation
+- ✅ Clean code principles
+- ✅ Meaningful variable names
+- ✅ XML documentation
+
+### Performance Considerations
+- Entity Framework query optimization
+- Materialized collections to avoid multiple enumerations
+- Indexed database fields
+- Async operations for I/O-bound work
+
+## 📧 Contact
+For any questions regarding this implementation, please contact me at [your email].
+
+---
+
+**Submitted:** November 2024  
+**Tech Test by:** Giacom
