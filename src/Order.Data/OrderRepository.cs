@@ -26,6 +26,7 @@ namespace Order.Data
         {
             var orders = await _orderContext.Order
                 .Include(x => x.Items)
+                    .ThenInclude(i => i.Product)
                 .Include(x => x.Status)
                 .Select(x => new OrderSummary
                 {
@@ -86,12 +87,13 @@ namespace Order.Data
         }
 
         /// <summary>
-        /// TASK 1: Gets all orders filtered by status
+        /// TASK 1: Gets all orders filtered by status 
         /// </summary>
         public async Task<IEnumerable<OrderSummary>> GetOrdersByStatusAsync(string statusName)
         {
             var orders = await _orderContext.Order
                 .Include(x => x.Items)
+                    .ThenInclude(i => i.Product)
                 .Include(x => x.Status)
                 .Where(x => x.Status.Name.ToLower() == statusName.ToLower())
                 .Select(x => new OrderSummary
@@ -146,12 +148,41 @@ namespace Order.Data
         /// </summary>
         public async Task<OrderDetail> CreateOrderAsync(CreateOrderRequest request)
         {
+            var duplicateProducts = request.Items
+                .GroupBy(i => i.ProductId)
+                .Where(g => g.Count() > 1)
+                .Select(g => g.Key)
+                .ToList();
+            
+            if (duplicateProducts.Any())
+                throw new InvalidOperationException(
+                    $"Duplicate products found: {string.Join(", ", duplicateProducts)}");
+            
             var createdStatus = await _orderContext.OrderStatus
                 .Where(x => x.Name.ToLower() == "created")
                 .SingleOrDefaultAsync();
             
             if (createdStatus == null)
                 throw new InvalidOperationException("Created status not found in database");
+            
+            var productIds = request.Items.Select(i => i.ProductId.ToByteArray()).ToList();
+            var products = await _orderContext.OrderProduct
+                .Include(p => p.Service) // Include service for ServiceName
+                .Where(p => _orderContext.Database.IsInMemory()
+                    ? productIds.Any(pid => pid.SequenceEqual(p.Id))
+                    : productIds.Contains(p.Id))
+                .ToListAsync();
+            
+            var productDict = products.ToDictionary(p => new Guid(p.Id), p => p);
+            
+            var missingProducts = request.Items
+                .Where(i => !productDict.ContainsKey(i.ProductId))
+                .Select(i => i.ProductId)
+                .ToList();
+            
+            if (missingProducts.Any())
+                throw new InvalidOperationException(
+                    $"Products not found: {string.Join(", ", missingProducts)}");
             
             var newOrderId = Guid.NewGuid();
             var newOrder = new Entities.Order
@@ -165,17 +196,10 @@ namespace Order.Data
             
             _orderContext.Order.Add(newOrder);
             
+            var orderItemsList = new List<Entities.OrderItem>();
             foreach (var itemRequest in request.Items)
             {
-                var productIdBytes = itemRequest.ProductId.ToByteArray();
-                var product = await _orderContext.OrderProduct
-                    .Where(x => _orderContext.Database.IsInMemory()
-                        ? x.Id.SequenceEqual(productIdBytes)
-                        : x.Id == productIdBytes)
-                    .SingleOrDefaultAsync();
-                
-                if (product == null)
-                    throw new InvalidOperationException($"Product with ID {itemRequest.ProductId} not found");
+                var product = productDict[itemRequest.ProductId];
                 
                 var orderItem = new Entities.OrderItem
                 {
@@ -187,11 +211,46 @@ namespace Order.Data
                 };
                 
                 _orderContext.OrderItem.Add(orderItem);
+                orderItemsList.Add(orderItem);
             }
             
             await _orderContext.SaveChangesAsync();
             
-            return await GetOrderByIdAsync(newOrderId);
+            return new OrderDetail
+            {
+                Id = newOrderId,
+                ResellerId = request.ResellerId,
+                CustomerId = request.CustomerId,
+                StatusId = new Guid(createdStatus.Id),
+                StatusName = "Created",
+                CreatedDate = newOrder.CreatedDate,
+                TotalCost = request.Items.Sum(i => 
+                    productDict[i.ProductId].UnitCost * i.Quantity),
+                TotalPrice = request.Items.Sum(i => 
+                    productDict[i.ProductId].UnitPrice * i.Quantity),
+                Items = request.Items.Select(i =>
+                {
+                    var p = productDict[i.ProductId];
+                    return new OrderItem
+                    {
+                        Id = orderItemsList.First(oi => 
+                            new Guid(oi.ProductId) == i.ProductId).Id != null 
+                            ? new Guid(orderItemsList.First(oi => 
+                                new Guid(oi.ProductId) == i.ProductId).Id) 
+                            : Guid.NewGuid(),
+                        OrderId = newOrderId,
+                        ServiceId = new Guid(p.ServiceId),
+                        ServiceName = p.Service?.Name,
+                        ProductId = i.ProductId,
+                        ProductName = p.Name,
+                        Quantity = i.Quantity,
+                        UnitCost = p.UnitCost,
+                        UnitPrice = p.UnitPrice,
+                        TotalCost = p.UnitCost * i.Quantity,
+                        TotalPrice = p.UnitPrice * i.Quantity
+                    };
+                }).ToList()
+            };
         }
 
         /// <summary>

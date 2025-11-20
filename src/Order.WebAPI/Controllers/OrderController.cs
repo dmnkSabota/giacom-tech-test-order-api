@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Order.Model;
 using Order.Service;
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace Order.WebAPI.Controllers
@@ -40,6 +41,9 @@ namespace Order.WebAPI.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetOrderById(Guid orderId)
         {
+            if (orderId == Guid.Empty)
+                return BadRequest(new { error = "Invalid order ID" });
+
             var order = await _orderService.GetOrderByIdAsync(orderId);
             return order != null ? Ok(order) : NotFound();
         }
@@ -72,6 +76,9 @@ namespace Order.WebAPI.Controllers
             Guid orderId, 
             [FromBody] UpdateOrderStatusRequest request)
         {
+            if (orderId == Guid.Empty)
+                return BadRequest(new { error = "Invalid order ID" });
+
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
             
@@ -95,7 +102,7 @@ namespace Order.WebAPI.Controllers
 
         /// <summary>
         /// TASK 3: POST /orders
-        /// Create a new order with items
+        /// Create a new order with items (OPTIMIZED with better validation)
         /// </summary>
         [HttpPost]
         [ProducesResponseType(StatusCodes.Status201Created)]
@@ -105,18 +112,36 @@ namespace Order.WebAPI.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
             
-            // Additional validation for Guid.Empty (data annotations can't validate this)
             if (request.ResellerId == Guid.Empty)
                 return BadRequest(new { error = "ResellerId cannot be empty" });
             
             if (request.CustomerId == Guid.Empty)
                 return BadRequest(new { error = "CustomerId cannot be empty" });
             
-            foreach (var item in request.Items)
-            {
-                if (item.ProductId == Guid.Empty)
-                    return BadRequest(new { error = "ProductId cannot be empty" });
-            }
+            var emptyProductIds = request.Items
+                .Where(i => i.ProductId == Guid.Empty)
+                .Select((item, index) => index)
+                .ToList();
+            
+            if (emptyProductIds.Any())
+                return BadRequest(new 
+                { 
+                    error = "ProductId cannot be empty",
+                    invalidItemIndices = emptyProductIds
+                });
+            
+            var duplicateProducts = request.Items
+                .GroupBy(i => i.ProductId)
+                .Where(g => g.Count() > 1)
+                .Select(g => g.Key)
+                .ToList();
+            
+            if (duplicateProducts.Any())
+                return BadRequest(new 
+                { 
+                    error = "Duplicate products are not allowed in the same order",
+                    duplicateProductIds = duplicateProducts
+                });
             
             try
             {
@@ -131,6 +156,15 @@ namespace Order.WebAPI.Controllers
             {
                 return BadRequest(new { error = ex.Message });
             }
+            catch (Exception ex)
+            {
+                // Log exception here in production
+                return StatusCode(500, new 
+                { 
+                    error = "An error occurred while creating the order",
+                    details = ex.Message 
+                });
+            }
         }
 
         /// <summary>
@@ -139,6 +173,7 @@ namespace Order.WebAPI.Controllers
         /// </summary>
         [HttpGet("profit/monthly")]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> GetMonthlyProfit()
         {
             try
@@ -148,7 +183,11 @@ namespace Order.WebAPI.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { error = ex.Message });
+                return StatusCode(500, new 
+                { 
+                    error = "An error occurred while calculating monthly profit",
+                    details = ex.Message 
+                });
             }
         }
     }

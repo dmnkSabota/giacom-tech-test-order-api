@@ -55,7 +55,7 @@ namespace Order.Service
         }
 
         /// <summary>
-        /// TASK 4: Calculates total profit by month for all completed orders
+        /// TASK 4: Calculates total profit by month for all completed orders 
         /// </summary>
         public async Task<IEnumerable<MonthlyProfitResponse>> CalculateMonthlyProfitAsync()
         {

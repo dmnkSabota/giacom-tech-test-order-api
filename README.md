@@ -6,10 +6,10 @@ Tech test submission for Giacom - REST API for order management.
 
 ## Tasks Completed
 
-- Task 1: Get orders by status endpoint - ** GET `/orders/status/{statusName}`
-- Task 2: Update order status endpoint - ** PUT `/orders/{orderId}/status` 
-- Task 3: Create new orders ** POST `/orders` 
-- Task 4: Monthly profit calculation ** GET `/orders/profit/monthly`
+- Task 1: Get orders by status endpoint - GET `/orders/status/{statusName}`
+- Task 2: Update order status endpoint - PUT `/orders/{orderId}/status` 
+- Task 3: Create new orders - POST `/orders` 
+- Task 4: Monthly profit calculation - GET `/orders/profit/monthly`
 
 
 All 21 unit tests passing.
