@@ -102,7 +102,6 @@ namespace Order.WebAPI.Controllers
 
         /// <summary>
         /// TASK 3: POST /orders
-        /// Create a new order with items (OPTIMIZED with better validation)
         /// </summary>
         [HttpPost]
         [ProducesResponseType(StatusCodes.Status201Created)]
@@ -120,7 +119,7 @@ namespace Order.WebAPI.Controllers
             
             var emptyProductIds = request.Items
                 .Where(i => i.ProductId == Guid.Empty)
-                .Select((item, index) => index)
+                .Select((index) => index)
                 .ToList();
             
             if (emptyProductIds.Any())

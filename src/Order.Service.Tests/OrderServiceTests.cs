@@ -28,7 +28,9 @@ namespace Order.Service.Tests
         private const string STATUS_COMPLETED = "Completed";
         private const string STATUS_FAILED = "Failed";
         
-        private const string PRODUCT_NAME = "100GB Mailbox";
+        private const string PRODUCT_NAME_1 = "10GB Mailbox";
+        private const string PRODUCT_NAME_2 = "50GB Mailbox";
+        private const string PRODUCT_NAME_3 = "100GB Mailbox";
         private const string SERVICE_NAME = "Email";
         
         private IOrderService _orderService;
@@ -44,6 +46,8 @@ namespace Order.Service.Tests
         
         private byte[] _serviceEmailId;
         private byte[] _productEmailId;
+        private byte[] _productEmail2Id;
+        private byte[] _productEmail3Id;
 
         [SetUp]
         public async Task Setup()
@@ -70,6 +74,8 @@ namespace Order.Service.Tests
             _statusFailedId = Guid.NewGuid().ToByteArray();
             _serviceEmailId = Guid.NewGuid().ToByteArray();
             _productEmailId = Guid.NewGuid().ToByteArray();
+            _productEmail2Id = Guid.NewGuid().ToByteArray();
+            _productEmail3Id = Guid.NewGuid().ToByteArray(); 
         }
 
         private async Task InitializeDatabaseAsync()
@@ -269,6 +275,9 @@ namespace Order.Service.Tests
             var createdOrder = await _orderService.CreateOrderAsync(request);
 
             Assert.AreEqual(2, createdOrder.Items.Count(), "Should create 2 order items");
+            
+            var productIds = createdOrder.Items.Select(i => i.ProductId).ToList();
+            Assert.AreEqual(2, productIds.Distinct().Count(), "Should have 2 distinct products");
         }
 
         [Test]
@@ -311,6 +320,30 @@ namespace Order.Service.Tests
             Assert.That(exception, Is.Not.Null, "Exception should be thrown");
             Assert.That(exception!.Message, Does.Contain("not found"), 
                 "Exception message should indicate product not found");
+        }
+
+        [Test]
+        public void CreateOrder_WhenDuplicateProducts_ThrowsException()
+        {
+            var request = new CreateOrderRequest
+            {
+                ResellerId = Guid.NewGuid(),
+                CustomerId = Guid.NewGuid(),
+                Items = new()
+                {
+                    new CreateOrderItemRequest { ProductId = new Guid(_productEmailId), Quantity = 5 },
+                    new CreateOrderItemRequest { ProductId = new Guid(_productEmailId), Quantity = 3 }
+                }
+            };
+
+            var exception = Assert.ThrowsAsync<InvalidOperationException>(
+                async () => await _orderService.CreateOrderAsync(request),
+                "Should throw exception for duplicate products"
+            );
+
+            Assert.That(exception, Is.Not.Null, "Exception should be thrown");
+            Assert.That(exception!.Message, Does.Contain("Duplicate products"), 
+                "Exception message should indicate duplicate products");
         }
         
         [Test]
@@ -452,18 +485,32 @@ namespace Order.Service.Tests
         }
 
         /// <summary>
-        /// Builds a create order request with multiple items
+        /// Builds a create order request with multiple items (uses DIFFERENT products)
         /// </summary>
         private CreateOrderRequest BuildCreateOrderRequest(int[] quantities)
         {
+            var productIds = new[] 
+            { 
+                _productEmailId, 
+                _productEmail2Id, 
+                _productEmail3Id 
+            };
+
+            if (quantities.Length > productIds.Length)
+            {
+                throw new ArgumentException(
+                    $"Can only create up to {productIds.Length} items. " +
+                    $"Add more test products or reduce quantity count.");
+            }
+
             return new CreateOrderRequest
             {
                 ResellerId = Guid.NewGuid(),
                 CustomerId = Guid.NewGuid(),
-                Items = quantities.Select(q => new CreateOrderItemRequest
+                Items = quantities.Select((quantity, index) => new CreateOrderItemRequest
                 {
-                    ProductId = new Guid(_productEmailId),
-                    Quantity = q
+                    ProductId = new Guid(productIds[index]), 
+                    Quantity = quantity
                 }).ToList()
             };
         }
@@ -535,14 +582,32 @@ namespace Order.Service.Tests
                 Name = SERVICE_NAME
             });
 
-            _orderContext.OrderProduct.Add(new OrderProduct
-            {
-                Id = _productEmailId,
-                Name = PRODUCT_NAME,
-                UnitCost = PRODUCT_UNIT_COST,
-                UnitPrice = PRODUCT_UNIT_PRICE,
-                ServiceId = _serviceEmailId
-            });
+            _orderContext.OrderProduct.AddRange(
+                new OrderProduct
+                {
+                    Id = _productEmailId,
+                    Name = PRODUCT_NAME_1,
+                    UnitCost = PRODUCT_UNIT_COST,
+                    UnitPrice = PRODUCT_UNIT_PRICE,
+                    ServiceId = _serviceEmailId
+                },
+                new OrderProduct
+                {
+                    Id = _productEmail2Id,
+                    Name = PRODUCT_NAME_2,
+                    UnitCost = PRODUCT_UNIT_COST,
+                    UnitPrice = PRODUCT_UNIT_PRICE,
+                    ServiceId = _serviceEmailId
+                },
+                new OrderProduct
+                {
+                    Id = _productEmail3Id,
+                    Name = PRODUCT_NAME_3,
+                    UnitCost = PRODUCT_UNIT_COST,
+                    UnitPrice = PRODUCT_UNIT_PRICE,
+                    ServiceId = _serviceEmailId
+                }
+            );
 
             await _orderContext.SaveChangesAsync();
         }
